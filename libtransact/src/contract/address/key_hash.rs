@@ -36,6 +36,7 @@ impl Addresser<String> for KeyHashAddresser {
     }
 }
 
+#[cfg(feature = "contract-address-test")]
 #[cfg(test)]
 mod tests {
     use super::*;

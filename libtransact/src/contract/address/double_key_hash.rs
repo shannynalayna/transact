@@ -48,6 +48,7 @@ impl Addresser<(String, String)> for DoubleKeyHashAddresser {
     }
 }
 
+#[cfg(feature = "contract-address-test")]
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -78,6 +78,7 @@ fn calculate_hash_lengths(
     }
 }
 
+#[cfg(feature = "contract-address-test")]
 #[cfg(test)]
 mod tests {
     use super::*;
