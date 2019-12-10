@@ -18,3 +18,23 @@
 mod error;
 
 pub use crate::contract::address::error::AddresserError;
+
+pub const ADDRESS_LENGTH: usize = 70;
+
+pub trait Addresser<K> {
+    /// Returns a radix address calculated from the given keys
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - Contains natural keys, as defined by K, used to calculate an address
+    ///
+    fn compute(&self, key: &K) -> Result<String, AddresserError>;
+
+    /// Returns a human readable string of the given keys
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - Contains natural keys, as defined by K
+    ///
+    fn normalize(&self, key: &K) -> String;
+}
