@@ -19,3 +19,5 @@
 pub mod address;
 #[cfg(feature = "contract-context")]
 pub mod context;
+#[cfg(feature = "contract-handler")]
+pub mod handler;
