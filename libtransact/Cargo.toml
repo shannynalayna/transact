@@ -48,6 +48,7 @@ experimental = [
     "contract-address-triple-key-hash",
     "contract-context",
     "contract-context-key-value",
+    "contract-handler-key-value",
     "key-value-state",
     "redis-db",
 ]
@@ -61,4 +62,8 @@ contract-address-double-key-hash = ["contract-address"]
 contract-address-triple-key-hash = ["contract-address"]
 contract-context = ["contract", "contract-address"]
 contract-context-key-value = ["contract-context", "key-value-state"]
+contract-handler-key-value = [
+    "contract-context-key-value",
+    "contract-address"
+]
 key-value-state = []
