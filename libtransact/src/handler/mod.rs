@@ -140,9 +140,9 @@ pub trait TransactionHandler: Send {
     /// transaction processor upon receiving a TpProcessRequest that the
     /// handler understands and will pass in the TpProcessRequest and an
     /// initialized instance of the Context type.
-    fn apply(
+    fn apply<'a>(
         &self,
         transaction: &TransactionPair,
-        context: &mut dyn TransactionContext,
+        context: &'a mut dyn TransactionContext,
     ) -> Result<(), ApplyError>;
 }
