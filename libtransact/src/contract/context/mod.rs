@@ -25,7 +25,10 @@ pub mod key_value;
 mod tests {
     use super::*;
 
+    use crate::contract::address::Addresser;
     use std::collections::HashMap;
+    use std::hash::Hash;
+    use std::marker::PhantomData;
     use std::sync::{Arc, Mutex};
 
     use crate::contract::address::{
@@ -33,7 +36,7 @@ mod tests {
         triple_key_hash::TripleKeyHashAddresser,
     };
     use crate::contract::context::handler::KeyValueTransactionHandler;
-    use crate::handler::{ContextError, TransactionContext};
+    use crate::handler::{ApplyError, ContextError, TransactionContext};
     use crate::protocol::key_value_state::ValueType;
     use crate::protocol::transaction::TransactionPair;
     use key_value::KeyValueTransactionContext;
@@ -163,6 +166,62 @@ mod tests {
         let mut value_map = HashMap::new();
         value_map.insert(key, value);
         value_map
+    }
+
+    struct TestSimpleTransactionHandler<A, K>
+    where
+        A: Addresser<K> + Clone + Send,
+    {
+        family_name: String,
+        family_versions: Vec<String>,
+        addresser: A,
+        // PhantomData<K> is necessary for the K generic to be used with the Addresser trait, as K is not
+        // used in any other elements of the KeyValueTransactionContext struct.
+        _key: PhantomData<K>,
+    }
+
+    impl<A, K> TestSimpleTransactionHandler<A, K>
+    where
+        A: Addresser<K> + Clone + Send,
+        K: Eq + Hash + Send,
+    {
+        fn new(addresser: A) -> Self {
+            TestSimpleTransactionHandler {
+                family_name: "test".into(),
+                family_versions: vec![],
+                addresser: addresser,
+                _key: PhantomData,
+            }
+        }
+    }
+
+    impl<A, K> KeyValueTransactionHandler for TestSimpleTransactionHandler<A, K>
+    where
+        A: Addresser<K> + Clone + Send,
+        K: Eq + Hash + Send,
+    {
+        type Key = K;
+        type Addr = A;
+
+        fn get_family_name(&self) -> &str {
+            &self.family_name
+        }
+
+        fn get_family_versions(&self) -> &[String] {
+            &self.family_versions
+        }
+
+        fn get_addresser(&self) -> A {
+            self.addresser.clone()
+        }
+
+        fn apply<'a>(
+            &self,
+            _transaction: &TransactionPair,
+            context: KeyValueTransactionContext<'a, A, K>,
+        ) -> Result<(), ApplyError> {
+            Ok(())
+        }
     }
 
     #[test]
@@ -972,4 +1031,8 @@ mod tests {
         // Verify this result is an Ok(())
         assert!(res.is_ok());
     }
+
+    #[test]
+    /// Tests the KeyValueTransactionHandler using a KeyHashAddresser implementation.
+    fn test_simple_handler() {}
 }
