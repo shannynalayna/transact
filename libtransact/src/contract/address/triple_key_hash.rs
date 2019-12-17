@@ -14,6 +14,7 @@
 
 use crate::contract::address::{hash, Addresser, AddresserError, ADDRESS_LENGTH};
 
+#[derive(Debug, Clone)]
 pub struct TripleKeyHashAddresser {
     prefix: String,
     first_hash_length: usize,
