@@ -1,0 +1,8 @@
+[package]
+name = "address-generator"
+version = "0.1.0"
+authors = ["Cargill Incorporated"]
+edition = "2018"
+
+[dependencies]
+transact = { path = "../../libtransact", features = ["contract-address-key-hash"] }
