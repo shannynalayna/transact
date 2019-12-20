@@ -16,5 +16,7 @@
  */
 
 pub mod error;
+#[cfg(feature = "contract-context-key-value-handler")]
+pub mod handler;
 #[cfg(feature = "contract-context-key-value")]
 pub mod key_value;
