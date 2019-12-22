@@ -13,6 +13,69 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use transact::contract::address::{key_hash::KeyHashAddresser, Addresser};
+use clap::{App, Arg};
 
-fn main() {}
+use transact::contract::address::{
+    double_key_hash::DoubleKeyHashAddresser, key_hash::KeyHashAddresser,
+    triple_key_hash::TripleKeyHashAddresser, Addresser,
+};
+
+fn main() {
+    let matches = App::new(clap::crate_name!())
+        .version(clap::crate_version!())
+        .author(clap::crate_authors!())
+        .about(clap::crate_description!())
+        .arg(
+            Arg::with_name("prefix")
+                .long("prefix")
+                .takes_value(true)
+                .required(true)
+                .help("the prefix of the radix address"),
+        )
+        .arg(
+            Arg::with_name("keys")
+                .required(true)
+                .takes_value(true)
+                .max_values(3)
+                .help("the natural key used to compute the radix address"),
+        )
+        .get_matches();
+    let prefix = matches
+        .value_of("prefix")
+        .expect("Unable to get `prefix` arg")
+        .to_string();
+    let keys: Vec<_> = matches
+        .values_of("keys")
+        .expect("Unable to get `keys` arg")
+        .collect();
+    match keys.len() {
+        1 => {
+            let addresser = KeyHashAddresser::new(prefix);
+            let addr = addresser
+                .compute(&keys[0].to_string())
+                .expect("Unable to compute hash");
+            println!("{:?}", addr);
+        }
+        2 => {
+            let addresser = DoubleKeyHashAddresser::new(prefix, None);
+            let addr = addresser
+                .compute(&(keys[0].to_string(), keys[1].to_string()))
+                .expect("Unable to compute hash");
+            println!("{:?}", addr);
+        }
+        3 => {
+            let addresser = TripleKeyHashAddresser::new(prefix, None, None);
+            let addr = addresser
+                .compute(&(
+                    keys[0].to_string(),
+                    keys[1].to_string(),
+                    keys[2].to_string(),
+                ))
+                .expect("Unable to compute hash");
+            println!("{:?}", addr);
+        }
+        _ => {
+            println!("Unable to compute radix address");
+        }
+    }
+}

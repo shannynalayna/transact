@@ -5,4 +5,9 @@ authors = ["Cargill Incorporated"]
 edition = "2018"
 
 [dependencies]
-transact = { path = "../../libtransact", features = ["contract-address-key-hash"] }
+clap = "2.32"
+transact = { path = "../../libtransact", features = [
+                                            "contract-address-key-hash",
+                                            "contract-address-double-key-hash",
+                                            "contract-address-triple-key-hash",
+                                            ] }
