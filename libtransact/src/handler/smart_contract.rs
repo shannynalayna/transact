@@ -12,17 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::hash::Hash;
+use crate::contract::handler::SmartContract;
 
-use crate::contract::address::Addresser;
-use crate::contract::context::key_value::KeyValueTransactionContext;
-use crate::handler::ApplyError;
-use crate::protocol::transaction::TransactionPair;
-
-pub trait SmartContract: Send {
-    fn apply<'a>(
-        &self,
-        transaction: &TransactionPair,
-        context: KeyValueTransactionContext<'a, Self::Addr, Self::Key>,
-    ) -> Result<(), ApplyError>;
+impl SmartContract for T
+where
+    T: TransactionHandler
+{
+    apply
 }

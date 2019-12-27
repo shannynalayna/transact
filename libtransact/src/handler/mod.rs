@@ -24,6 +24,8 @@
 //! writing from state, as well appending events and other opaque data to the receipt.
 
 mod error;
+#[cfg(feature = "contract-handler-key-value")]
+pub mod smart_contract;
 
 pub use crate::handler::error::{ApplyError, ContextError};
 use crate::protocol::transaction::TransactionPair;
