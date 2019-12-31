@@ -29,10 +29,10 @@ pub trait SmartContract: Send {
 
     fn get_addresser(&self) -> Self::Addr;
 
-    fn make_context<'a>(
+    fn make_context(
         &self,
         addresser: Self::Addr,
-        context: &'a mut dyn TransactionContext,
+        context: &mut dyn TransactionContext,
     ) -> Self::Context;
 
     fn apply(
