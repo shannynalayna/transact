@@ -18,7 +18,7 @@ use crate::protocol::transaction::TransactionPair;
 
 impl<T> TransactionHandler for T
 where
-    T: SmartContract + Send,
+    T: SmartContract,
 {
     fn family_name(&self) -> &str {
         self.get_family_name()
@@ -34,6 +34,6 @@ where
         context: &mut dyn TransactionContext,
     ) -> Result<(), ApplyError> {
         let contract_context = self.make_context(self.get_addresser(), context);
-        self.apply(transaction, contract_context)
+        SmartContract::apply(self, transaction, contract_context)
     }
 }
