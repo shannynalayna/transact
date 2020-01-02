@@ -29,22 +29,22 @@ pub trait SmartContract: Send {
 
     fn get_addresser(&self) -> Self::Addr;
 
-    fn make_context(
+    fn make_context<'a>(
         &self,
         addresser: Self::Addr,
-        context: &mut dyn TransactionContext,
-    ) -> Self::Context;
+        context: &'a mut dyn TransactionContext,
+    ) -> &mut Self::Context;
 
     fn apply(
         &self,
         transaction: &TransactionPair,
-        context: Self::Context,
+        context: &mut Self::Context,
     ) -> Result<(), ApplyError>;
 }
 
 impl<T> TransactionHandler for T
 where
-    T: SmartContract + Send,
+    T: SmartContract,
 {
     fn family_name(&self) -> &str {
         self.get_family_name()
@@ -60,6 +60,6 @@ where
         context: &mut dyn TransactionContext,
     ) -> Result<(), ApplyError> {
         let contract_context = self.make_context(self.get_addresser(), context);
-        self.apply(transaction, contract_context)
+        SmartContract::apply(self, transaction, contract_context)
     }
 }

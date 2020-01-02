@@ -66,18 +66,18 @@ where
         self.addresser.clone()
     }
 
-    fn make_context(
+    fn make_context<'a>(
         &self,
         addresser: KeyHashAddresser,
-        context: &mut dyn TransactionContext,
-    ) -> KeyValueTransactionContext<'b, KeyHashAddresser, String> {
-        KeyValueTransactionContext::new(context, addresser)
+        context: &'a mut dyn TransactionContext,
+    ) -> &mut Self::Context {
+        &mut KeyValueTransactionContext::new(context, addresser)
     }
 
     fn apply(
         &self,
         transaction: &TransactionPair,
-        context: KeyValueTransactionContext<'b, KeyHashAddresser, String>,
+        context: &mut Self::Context,
     ) -> Result<(), ApplyError> {
         unimplemented!()
     }
