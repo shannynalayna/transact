@@ -17,7 +17,7 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 
 use crate::contract::address::Addresser;
-use crate::contract::context::error::ContractContextError;
+use crate::contract::context::{error::ContractContextError, ContractContext};
 use crate::handler::TransactionContext;
 use crate::protocol::key_value_state::{
     StateEntry, StateEntryBuilder, StateEntryList, StateEntryListBuilder, StateEntryValue,
@@ -109,176 +109,6 @@ where
         Ok(self.delete_state_entries(vec![key])?.into_iter().next())
     }
 
-    /// Serializes each value in the provided map and attempts to set in state each of these objects
-    /// at the address calculated from its corresponding natural key.
-    ///
-    /// Returns an `Ok(())` if the provided entries were successfully stored.
-    ///
-    /// # Arguments
-    ///
-    /// * `entries` - HashMap with the map to be stored in state at the associated natural key
-    pub fn set_state_entries(
-        &self,
-        entries: HashMap<&K, HashMap<String, ValueType>>,
-    ) -> Result<(), ContractContextError> {
-        let keys = entries.keys().map(ToOwned::to_owned).collect::<Vec<&K>>();
-        let addresses = keys
-            .iter()
-            .map(|k| {
-                self.addresser
-                    .compute(&k)
-                    .map_err(ContractContextError::AddresserError)
-            })
-            .collect::<Result<Vec<String>, ContractContextError>>()?;
-        // Creating a map of the StateEntryList to the address it is stored at
-        let entry_list_map = self.get_state_entry_lists(&addresses)?;
-
-        // Iterating over the provided HashMap to see if there is an existing StateEntryList at the
-        // corresponding address. If there is one found, add the new StateEntry to the StateEntryList.
-        // If there is none found, creates a new StateEntryList entry for that address. Then,
-        // serializes the newly created StateEntryList to be set in the internal context.
-        let entries_list = entries
-            .iter()
-            .map(|(key, values)| {
-                let addr = self.addresser.compute(key)?;
-                let state_entry = self.create_state_entry(key, values.to_owned())?;
-                match entry_list_map.get(&addr) {
-                    Some(entry_list) => {
-                        let mut existing_entries = entry_list.entries().to_vec();
-                        existing_entries.push(state_entry);
-                        let entry_list = StateEntryListBuilder::new()
-                            .with_state_entries(existing_entries)
-                            .build()
-                            .map_err(|err| {
-                                ContractContextError::ProtocolBuildError(Box::new(err))
-                            })?;
-                        Ok((addr, entry_list.into_bytes()?))
-                    }
-                    None => {
-                        let entry_list = StateEntryListBuilder::new()
-                            .with_state_entries(vec![state_entry])
-                            .build()
-                            .map_err(|err| {
-                                ContractContextError::ProtocolBuildError(Box::new(err))
-                            })?;
-                        Ok((addr, entry_list.into_bytes()?))
-                    }
-                }
-            })
-            .collect::<Result<Vec<(String, Vec<u8>)>, ContractContextError>>()?;
-        self.context.set_state_entries(entries_list)?;
-
-        Ok(())
-    }
-
-    /// Attempts to retrieve the data from state at the addresses calculated from the provided list
-    /// of natural keys.
-    ///
-    /// Returns a HashMap that links a normalized key with a HashMap. The associated HashMap represents
-    /// the data retrieved from state. Only returns the data from addresses that have been set.
-    ///
-    /// # Arguments
-    ///
-    /// * `keys` - A list of natural keys to be fetched from state
-    pub fn get_state_entries(
-        &self,
-        keys: Vec<&K>,
-    ) -> Result<HashMap<String, HashMap<String, ValueType>>, ContractContextError> {
-        let addresses = keys
-            .iter()
-            .map(|k| {
-                self.addresser
-                    .compute(&k)
-                    .map_err(ContractContextError::AddresserError)
-            })
-            .collect::<Result<Vec<String>, ContractContextError>>()?;
-        let normalized_keys = keys
-            .iter()
-            .map(|k| self.addresser.normalize(&k))
-            .collect::<Vec<String>>();
-
-        let state_entries: Vec<StateEntry> = self.flatten_state_entries(&addresses)?;
-
-        // Now going to filter the StateEntry objects that actually have a matching normalized key
-        // and convert the normalized key and value to be added to the returned HashMap.
-        state_entries
-            .iter()
-            .filter(|entry| normalized_keys.contains(&entry.normalized_key().to_string()))
-            .map(|entry| {
-                let values = entry
-                    .state_entry_values()
-                    .iter()
-                    .map(|val| (val.key().to_string(), val.value().to_owned()))
-                    .collect::<HashMap<String, ValueType>>();
-                Ok((entry.normalized_key().to_string(), values))
-            })
-            .collect::<Result<HashMap<String, HashMap<String, ValueType>>, ContractContextError>>()
-    }
-
-    /// Attempts to unset the data in state at the addresses calculated from each natural key in the
-    /// provided list.
-    ///
-    /// Returns a list of normalized keys of successfully deleted state entries.
-    ///
-    /// # Arguments
-    ///
-    /// * `keys` - A list of natural keys to be deleted from state
-    pub fn delete_state_entries(&self, keys: Vec<K>) -> Result<Vec<String>, ContractContextError> {
-        let key_map: HashMap<String, String> = keys
-            .iter()
-            .map(|k| Ok((self.addresser.normalize(k), self.addresser.compute(k)?)))
-            .collect::<Result<HashMap<String, String>, ContractContextError>>()?;
-        let state_entry_lists: HashMap<String, StateEntryList> = self.get_state_entry_lists(
-            &key_map
-                .values()
-                .map(ToOwned::to_owned)
-                .collect::<Vec<String>>(),
-        )?;
-
-        let mut deleted_keys = Vec::new();
-        let mut new_entry_lists = Vec::new();
-        let mut delete_lists = Vec::new();
-        key_map.iter().for_each(|(nkey, addr)| {
-            // Fetching the StateEntryList at the corresponding address
-            if let Some(list) = state_entry_lists.get(addr) {
-                // The StateEntry objects will be filtered out of the StateEntryList if it has the
-                // normalized key. This normalized key is added to a list of successfully filtered
-                // entries to be returned.
-                if list.contains(nkey.to_string()) {
-                    let filtered = list
-                        .entries()
-                        .to_vec()
-                        .into_iter()
-                        .filter(|e| e.normalized_key() != nkey)
-                        .collect::<Vec<StateEntry>>();
-                    if filtered.is_empty() {
-                        delete_lists.push(addr.to_string());
-                    } else {
-                        new_entry_lists.push((addr.to_string(), filtered));
-                    }
-                    deleted_keys.push(nkey.to_string());
-                }
-            }
-        });
-        // Delete any StateEntryLists that have an empty list of entries
-        self.context.delete_state_entries(delete_lists.as_slice())?;
-        // Setting the newly filtered StateEntryLists into state using the internal context
-        self.context.set_state_entries(
-            new_entry_lists
-                .iter()
-                .map(|(addr, filtered_list)| {
-                    let new_entry_list = StateEntryListBuilder::new()
-                        .with_state_entries(filtered_list.to_vec())
-                        .build()
-                        .map_err(|err| ContractContextError::ProtocolBuildError(Box::new(err)))?;
-                    Ok((addr.to_string(), new_entry_list.into_bytes()?))
-                })
-                .collect::<Result<Vec<(String, Vec<u8>)>, ContractContextError>>()?,
-        )?;
-
-        Ok(deleted_keys)
-    }
-
     /// Adds a blob to the execution result for this transaction.
     ///
     /// # Arguments
@@ -355,6 +185,187 @@ where
             .with_state_entry_values(state_values)
             .build()
             .map_err(|err| ContractContextError::ProtocolBuildError(Box::new(err)))?)
+    }
+}
+
+impl<'a, A, K> ContractContext<'a, A, K> for KeyValueTransactionContext<'a, A, K>
+where
+    A: Addresser<K>,
+    K: Eq + Hash,
+{
+    type State_Value = ValueType;
+
+    fn make_context(context: &'a mut dyn TransactionContext, addresser: A) -> Self {
+        Self::new(context, addresser)
+    }
+    /// Serializes each value in the provided map and attempts to set in state each of these objects
+    /// at the address calculated from its corresponding natural key.
+    ///
+    /// Returns an `Ok(())` if the provided entries were successfully stored.
+    ///
+    /// # Arguments
+    ///
+    /// * `entries` - HashMap with the map to be stored in state at the associated natural key
+    fn set_state_entries(
+        &self,
+        entries: HashMap<&K, HashMap<String, Self::State_Value>>,
+    ) -> Result<(), ContractContextError> {
+        let keys = entries.keys().map(ToOwned::to_owned).collect::<Vec<&K>>();
+        let addresses = keys
+            .iter()
+            .map(|k| {
+                self.addresser
+                    .compute(&k)
+                    .map_err(ContractContextError::AddresserError)
+            })
+            .collect::<Result<Vec<String>, ContractContextError>>()?;
+        // Creating a map of the StateEntryList to the address it is stored at
+        let entry_list_map = self.get_state_entry_lists(&addresses)?;
+
+        // Iterating over the provided HashMap to see if there is an existing StateEntryList at the
+        // corresponding address. If there is one found, add the new StateEntry to the StateEntryList.
+        // If there is none found, creates a new StateEntryList entry for that address. Then,
+        // serializes the newly created StateEntryList to be set in the internal context.
+        let entries_list = entries
+            .iter()
+            .map(|(key, values)| {
+                let addr = self.addresser.compute(key)?;
+                let state_entry = self.create_state_entry(key, values.to_owned())?;
+                match entry_list_map.get(&addr) {
+                    Some(entry_list) => {
+                        let mut existing_entries = entry_list.entries().to_vec();
+                        existing_entries.push(state_entry);
+                        let entry_list = StateEntryListBuilder::new()
+                            .with_state_entries(existing_entries)
+                            .build()
+                            .map_err(|err| {
+                                ContractContextError::ProtocolBuildError(Box::new(err))
+                            })?;
+                        Ok((addr, entry_list.into_bytes()?))
+                    }
+                    None => {
+                        let entry_list = StateEntryListBuilder::new()
+                            .with_state_entries(vec![state_entry])
+                            .build()
+                            .map_err(|err| {
+                                ContractContextError::ProtocolBuildError(Box::new(err))
+                            })?;
+                        Ok((addr, entry_list.into_bytes()?))
+                    }
+                }
+            })
+            .collect::<Result<Vec<(String, Vec<u8>)>, ContractContextError>>()?;
+        self.context.set_state_entries(entries_list)?;
+
+        Ok(())
+    }
+
+    /// Attempts to retrieve the data from state at the addresses calculated from the provided list
+    /// of natural keys.
+    ///
+    /// Returns a HashMap that links a normalized key with a HashMap. The associated HashMap represents
+    /// the data retrieved from state. Only returns the data from addresses that have been set.
+    ///
+    /// # Arguments
+    ///
+    /// * `keys` - A list of natural keys to be fetched from state
+    fn get_state_entries(
+        &self,
+        keys: Vec<&K>,
+    ) -> Result<HashMap<String, HashMap<String, Self::State_Value>>, ContractContextError> {
+        let addresses = keys
+            .iter()
+            .map(|k| {
+                self.addresser
+                    .compute(&k)
+                    .map_err(ContractContextError::AddresserError)
+            })
+            .collect::<Result<Vec<String>, ContractContextError>>()?;
+        let normalized_keys = keys
+            .iter()
+            .map(|k| self.addresser.normalize(&k))
+            .collect::<Vec<String>>();
+
+        let state_entries: Vec<StateEntry> = self.flatten_state_entries(&addresses)?;
+
+        // Now going to filter the StateEntry objects that actually have a matching normalized key
+        // and convert the normalized key and value to be added to the returned HashMap.
+        state_entries
+            .iter()
+            .filter(|entry| normalized_keys.contains(&entry.normalized_key().to_string()))
+            .map(|entry| {
+                let values = entry
+                    .state_entry_values()
+                    .iter()
+                    .map(|val| (val.key().to_string(), val.value().to_owned()))
+                    .collect::<HashMap<String, ValueType>>();
+                Ok((entry.normalized_key().to_string(), values))
+            })
+            .collect::<Result<HashMap<String, HashMap<String, ValueType>>, ContractContextError>>()
+    }
+
+    /// Attempts to unset the data in state at the addresses calculated from each natural key in the
+    /// provided list.
+    ///
+    /// Returns a list of normalized keys of successfully deleted state entries.
+    ///
+    /// # Arguments
+    ///
+    /// * `keys` - A list of natural keys to be deleted from state
+    fn delete_state_entries(&self, keys: Vec<K>) -> Result<Vec<String>, ContractContextError> {
+        let key_map: HashMap<String, String> = keys
+            .iter()
+            .map(|k| Ok((self.addresser.normalize(k), self.addresser.compute(k)?)))
+            .collect::<Result<HashMap<String, String>, ContractContextError>>()?;
+        let state_entry_lists: HashMap<String, StateEntryList> = self.get_state_entry_lists(
+            &key_map
+                .values()
+                .map(ToOwned::to_owned)
+                .collect::<Vec<String>>(),
+        )?;
+
+        let mut deleted_keys = Vec::new();
+        let mut new_entry_lists = Vec::new();
+        let mut delete_lists = Vec::new();
+        key_map.iter().for_each(|(nkey, addr)| {
+            // Fetching the StateEntryList at the corresponding address
+            if let Some(list) = state_entry_lists.get(addr) {
+                // The StateEntry objects will be filtered out of the StateEntryList if it has the
+                // normalized key. This normalized key is added to a list of successfully filtered
+                // entries to be returned.
+                if list.contains(nkey.to_string()) {
+                    let filtered = list
+                        .entries()
+                        .to_vec()
+                        .into_iter()
+                        .filter(|e| e.normalized_key() != nkey)
+                        .collect::<Vec<StateEntry>>();
+                    if filtered.is_empty() {
+                        delete_lists.push(addr.to_string());
+                    } else {
+                        new_entry_lists.push((addr.to_string(), filtered));
+                    }
+                    deleted_keys.push(nkey.to_string());
+                }
+            }
+        });
+        // Delete any StateEntryLists that have an empty list of entries
+        self.context.delete_state_entries(delete_lists.as_slice())?;
+        // Setting the newly filtered StateEntryLists into state using the internal context
+        self.context.set_state_entries(
+            new_entry_lists
+                .iter()
+                .map(|(addr, filtered_list)| {
+                    let new_entry_list = StateEntryListBuilder::new()
+                        .with_state_entries(filtered_list.to_vec())
+                        .build()
+                        .map_err(|err| ContractContextError::ProtocolBuildError(Box::new(err)))?;
+                    Ok((addr.to_string(), new_entry_list.into_bytes()?))
+                })
+                .collect::<Result<Vec<(String, Vec<u8>)>, ContractContextError>>()?,
+        )?;
+
+        Ok(deleted_keys)
     }
 }
 

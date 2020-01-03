@@ -18,3 +18,30 @@
 pub mod error;
 #[cfg(feature = "contract-context-key-value")]
 pub mod key_value;
+
+use std::collections::HashMap;
+
+use crate::contract::address::Addresser;
+use crate::contract::context::error::ContractContextError;
+use crate::handler::TransactionContext;
+
+pub trait ContractContext<'a, A, K>
+where
+    A: Addresser<K>,
+{
+    type State_Value;
+
+    fn make_context(context: &'a mut dyn TransactionContext, addresser: A) -> Self;
+
+    fn set_state_entries(
+        &self,
+        entries: HashMap<&K, HashMap<String, Self::State_Value>>,
+    ) -> Result<(), ContractContextError>;
+
+    fn get_state_entries(
+        &self,
+        keys: Vec<&K>,
+    ) -> Result<HashMap<String, HashMap<String, Self::State_Value>>, ContractContextError>;
+
+    fn delete_state_entries(&self, keys: Vec<K>) -> Result<Vec<String>, ContractContextError>;
+}
