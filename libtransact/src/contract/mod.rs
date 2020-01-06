@@ -25,13 +25,14 @@ pub mod handler;
 use std::hash::Hash;
 
 use crate::contract::address::Addresser;
+use crate::contract::context::ContractContext;
 use crate::handler::{ApplyError, TransactionContext};
 use crate::protocol::transaction::TransactionPair;
 
 pub trait SmartContract: Send {
     type Key: Eq + Hash;
     type Addr: Addresser<Self::Key>;
-    type Context;
+    type Value;
 
     fn get_family_name(&self) -> &str;
 
@@ -43,11 +44,11 @@ pub trait SmartContract: Send {
         &self,
         addresser: Self::Addr,
         context: &'a mut dyn TransactionContext,
-    ) -> &mut Self::Context;
+    ) -> &'a mut dyn ContractContext<'a, Self::Key, Self::Addr, State_Value = Self::Value>;
 
-    fn apply(
+    fn apply<'a>(
         &self,
         transaction: &TransactionPair,
-        context: &mut Self::Context,
+        context: &'a mut dyn ContractContext<'a, Self::Key, Self::Addr, State_Value = Self::Value>,
     ) -> Result<(), ApplyError>;
 }

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::contract::context::ContractContext;
 use crate::contract::SmartContract;
 use crate::handler::{ApplyError, TransactionContext, TransactionHandler};
 use crate::protocol::transaction::TransactionPair;
@@ -33,7 +34,7 @@ where
         transaction: &TransactionPair,
         context: &mut dyn TransactionContext,
     ) -> Result<(), ApplyError> {
-        let contract_context = self.make_context(self.get_addresser(), context);
+        let contract_context = ContractContext::make_context(context, self.get_addresser());
         SmartContract::apply(self, transaction, contract_context)
     }
 }

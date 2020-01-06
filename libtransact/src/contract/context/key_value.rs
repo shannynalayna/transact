@@ -195,8 +195,8 @@ where
 {
     type State_Value = ValueType;
 
-    fn make_context(context: &'a mut dyn TransactionContext, addresser: A) -> Self {
-        Self::new(context, addresser)
+    fn make_context(self, context: &'a mut dyn TransactionContext, addresser: A) -> Self {
+        KeyValueTransactionContext::new(context, addresser)
     }
     /// Serializes each value in the provided map and attempts to set in state each of these objects
     /// at the address calculated from its corresponding natural key.
