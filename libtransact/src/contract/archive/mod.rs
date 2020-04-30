@@ -74,6 +74,8 @@ impl SmartContractArchive {
     /// The scar file to load will be named `<name>_<version>.scar`, where `<name>` is the name
     /// specified for this method and `<version>` is a valid semver string.
     ///
+    /// The `name` argument for this method must not contain any underscores, '_'.
+    ///
     /// The `version` argument for this method must be a valid semver requirement string. The
     /// latest contract (based on semver requirement rules) that matches the given name and meets
     /// the version requirements will be loaded.
@@ -213,6 +215,9 @@ pub struct SmartContractMetadata {
 
 fn find_scar<P: AsRef<Path>>(name: &str, version: &str, paths: &[P]) -> Result<PathBuf, Error> {
     let file_name_pattern = format!("{}_*.scar", name);
+
+    validate_scar_file_name(name, version)?;
+
     let version_req = VersionReq::parse(version)?;
 
     // Start with all scar files that match the name, from all paths
@@ -254,6 +259,21 @@ fn find_scar<P: AsRef<Path>>(name: &str, version: &str, paths: &[P]) -> Result<P
                 name, version_req, paths,
             ))
         })
+}
+
+fn validate_scar_file_name(file_name: &str, version: &str) -> Result<(), Error> {
+    if file_name.contains('_') {
+        return Err(Error::new(&format!(
+            "invalid .scar file name, must not include '_': {}",
+            file_name
+        )));
+    } else if let Err(err) = VersionReq::parse(version) {
+        return Err(Error::new_with_source(
+            &format!("invalid version requirement: `{}`", version),
+            Box::new(err),
+        ));
+    }
+    Ok(())
 }
 
 fn path_is_manifest(path: &std::path::Path) -> bool {
@@ -323,6 +343,25 @@ mod tests {
         write_mock_scar(&dir, "mock", "0.1.0");
 
         assert!(find_scar("nonexistent", "0.1.0", &[&dir]).is_err());
+    }
+
+    /// Verify that an error is returned when the contract name contains '_'.
+    #[test]
+    fn find_scar_invalid_name() {
+        let dir = new_temp_dir();
+
+        assert!(find_scar("non_existent", "0.1.0", &[&dir]).is_err());
+    }
+
+    /// Verify that an error is returned when the contract name contains '_'.
+    #[test]
+    fn find_scar_invalid_semver() {
+        let dir = new_temp_dir();
+
+        let err = find_scar("nonexistent", "0..1..0", &[&dir]);
+
+        assert!(err.is_err());
+        assert!(find_scar("nonexistent", "0..1..0", &[&dir]).is_err());
     }
 
     /// Verify that an error is returned when no matching contract is found in the given path.
