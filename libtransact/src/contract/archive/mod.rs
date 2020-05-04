@@ -189,12 +189,14 @@ impl SmartContractArchive {
                 file_path.display()
             ))
         })?;
-        let metadata = metadata.ok_or_else(|| {
+        let metadata: SmartContractMetadata = metadata.ok_or_else(|| {
             Error::new(&format!(
                 "invalid scar file: manifest.yaml not found in {}",
                 file_path.display()
             ))
         })?;
+
+        validate_metadata(&name, &metadata.name)?;
 
         Ok(SmartContractArchive { contract, metadata })
     }
@@ -267,6 +269,19 @@ fn validate_scar_file_name(name: &str) -> Result<(), Error> {
         return Err(Error::new(&format!(
             "invalid scar file name, must not include '_': {}",
             name
+        )));
+    }
+    Ok(())
+}
+
+// Validate that the metadata collected from the manifest contains a contract name which matches
+// the name of the scar file. This includes swapping any underscores which appear in the contract
+// name with dashes, as underscores are not allowed in scar file names.
+fn validate_metadata(file_name: &str, contract_name: &str) -> Result<(), Error> {
+    if file_name != contract_name.replace("_", "-") {
+        return Err(Error::new(&format!(
+            "scar file name '{}' doesn't match contract name in manifest '{}'",
+            file_name, contract_name,
         )));
     }
     Ok(())
