@@ -101,7 +101,13 @@ contract-address-double-key-hash = ["contract-address"]
 contract-address-triple-key-hash = ["contract-address"]
 contract-archive = ["bzip2", "contract", "glob", "semver", "serde", "serde_derive", "serde_yaml", "tar"]
 contract-context = ["contract", "contract-address"]
-contract-context-key-value = ["contract-context", "key-value-state"]
+contract-context-key-value = [
+    "contract-address-double-key-hash",
+    "contract-address-key-hash",
+    "contract-address-triple-key-hash",
+    "contract-context",
+    "key-value-state"
+]
 family-command = []
 family-xo = ["rand_hc", "workload"]
 key-value-state = []
