@@ -21,3 +21,21 @@ pub mod address;
 pub mod archive;
 #[cfg(feature = "contract-context")]
 pub mod context;
+
+use std::hash::Hash;
+
+use crate::contract::address::Addresser;
+use crate::handler::ApplyError;
+use crate::protocol::transaction::TransactionPair;
+
+pub trait SmartContract: Send {
+    type Key: Eq + Hash;
+    type Addr: Addresser<Self::Key>;
+    type Context;
+
+    fn apply(
+        &self,
+        transaction: &TransactionPair,
+        context: &mut Self::Context,
+    ) -> Result<(), ApplyError>;
+}
