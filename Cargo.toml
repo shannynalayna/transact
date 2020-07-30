@@ -1,2 +1,2 @@
 [workspace]
-members = ["libtransact", "examples/simple_xo", "examples/address_generator"]
+members = ["libtransact", "examples/simple_xo", "examples/address_generator", "examples/contract_hello_world"]
