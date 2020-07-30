@@ -20,7 +20,7 @@ authors = ["IBM Corp.", "Cargill Incorporated"]
 edition = "2018"
 
 [dependencies]
-transact = { version = "0.1.6", features = ["sawtooth-compat"] }
+transact = { version = "0.2.4", features = ["sawtooth-compat"] }
 sawtooth-xo = "0.3"
 hex = "0.3"
 sha2 = "0.8"
