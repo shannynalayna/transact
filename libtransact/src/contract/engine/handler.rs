@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Cargill Incorporated
+ * Copyright 2018-2020 Cargill Incorporated
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,33 +15,39 @@
  * -----------------------------------------------------------------------------
  */
 
-#[cfg(feature = "contract-address")]
-pub mod address;
-#[cfg(feature = "contract-archive")]
-pub mod archive;
-#[cfg(feature = "contract-context")]
-pub mod context;
-#[cfg(feature = "contract-engine")]
-pub mod engine;
-
-use crate::contract::engine::SmartContractEngine;
-use crate::handler::{ApplyError, TransactionContext};
+use crate::contract::{engine::SmartContractEngine, SmartContract};
+use crate::handler::{ApplyError, TransactionContext, TransactionHandler};
 use crate::protocol::transaction::TransactionPair;
 
-pub trait SmartContract: Send {
-    fn apply(
-        &self,
-        transaction: &TransactionPair,
-        context: &mut dyn TransactionContext,
-    ) -> Result<(), ApplyError>;
+pub struct SmartContractEngineTransactionHandler {
+    versions: Vec<String>,
+    smart_contract: dyn SmartContract,
 }
 
-impl SmartContractEngine for dyn SmartContract {
+impl SmartContractEngine for SmartContractEngineTransactionHandler {
     fn apply_smart_contract(
         &self,
         transaction: &TransactionPair,
         context: &mut dyn TransactionContext,
     ) -> Result<(), ApplyError> {
-        SmartContract::apply(self, transaction, context)
+        self.smart_contract.apply(transaction, context)
+    }
+}
+
+impl TransactionHandler for SmartContractEngineTransactionHandler {
+    fn family_name(&self) -> &str {
+        "smart_contract_engine_transaction_handler"
+    }
+
+    fn family_versions(&self) -> &[String] {
+        &self.versions
+    }
+
+    fn apply(
+        &self,
+        transaction: &TransactionPair,
+        context: &mut dyn TransactionContext,
+    ) -> Result<(), ApplyError> {
+        self.apply_smart_contract(transaction, context)
     }
 }
